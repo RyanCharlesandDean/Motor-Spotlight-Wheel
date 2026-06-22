@@ -1,0 +1,364 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spotlight Wheel — Motor Huddle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#051C2C; --teal:#4FAD9F; --light:#B4FFEB; --ink:#0c2433;
+    --teal-deep:#2d7d72; --teal-mid:#3f9488; --paper:#f3faf8;
+    --display:"Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    --body:"Inter", ui-sans-serif, system-ui, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:var(--body); color:var(--light);
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #0a2e44 0%, transparent 60%),
+      var(--navy);
+    min-height:100vh; padding:28px 18px 48px;
+  }
+  .wrap{max-width:1040px; margin:0 auto}
+  header{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:6px}
+  .brand{font-family:var(--display); font-weight:700; letter-spacing:.14em; font-size:13px; text-transform:uppercase; color:var(--teal)}
+  h1{font-family:var(--display); font-weight:700; font-size:clamp(28px,5vw,46px); margin:.1em 0 0; color:#fff; letter-spacing:-.01em}
+  .sub{color:#9fc3ba; font-size:14px; margin:4px 0 0}
+  .grid{display:grid; grid-template-columns:1.15fr .85fr; gap:30px; margin-top:26px; align-items:start}
+  @media (max-width:820px){.grid{grid-template-columns:1fr}}
+
+  /* wheel */
+  .stage{position:relative; display:flex; flex-direction:column; align-items:center}
+  .wheelbox{position:relative; width:min(440px,86vw); aspect-ratio:1}
+  canvas{width:100%; height:100%; display:block; filter:drop-shadow(0 18px 40px rgba(0,0,0,.45))}
+  .pointer{position:absolute; top:-6px; left:50%; transform:translateX(-50%); z-index:3;
+    width:0; height:0; border-left:17px solid transparent; border-right:17px solid transparent;
+    border-top:30px solid var(--light); filter:drop-shadow(0 3px 4px rgba(0,0,0,.4))}
+  .hub{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2;
+    width:74px; height:74px; border-radius:50%; background:var(--navy); border:3px solid var(--light);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none;
+    font-family:var(--display); font-weight:700; font-size:13px; letter-spacing:.12em; color:var(--light);
+    text-transform:uppercase; transition:transform .12s ease, background .12s ease}
+  .hub:hover{transform:translate(-50%,-50%) scale(1.06); background:#0a2638}
+  .hub:active{transform:translate(-50%,-50%) scale(.96)}
+  .hub.busy{cursor:default; color:#5e8c84}
+
+  .result{min-height:64px; margin-top:22px; text-align:center}
+  .result .label{font-family:var(--display); letter-spacing:.16em; text-transform:uppercase; font-size:11px; color:var(--teal)}
+  .result .name{font-family:var(--display); font-weight:700; font-size:clamp(26px,5vw,40px); color:#fff; margin-top:2px; line-height:1.05}
+  .result .name.placeholder{color:#3f6b62; font-weight:500; font-size:18px; letter-spacing:0}
+
+  /* panel */
+  .panel{background:rgba(255,255,255,.04); border:1px solid rgba(180,255,235,.14); border-radius:16px; padding:20px}
+  .panel h2{font-family:var(--display); font-weight:700; font-size:14px; letter-spacing:.06em; text-transform:uppercase; color:var(--light); margin:0 0 14px}
+  .addrow{display:flex; gap:8px; margin-bottom:14px}
+  input[type=text]{flex:1; background:var(--navy); border:1px solid rgba(180,255,235,.22); color:#fff;
+    border-radius:10px; padding:11px 13px; font-family:var(--body); font-size:15px; outline:none}
+  input[type=text]:focus{border-color:var(--teal)}
+  input::placeholder{color:#5e8c84}
+  .btn{font-family:var(--display); font-weight:700; letter-spacing:.04em; border:0; border-radius:10px; cursor:pointer; font-size:14px; padding:11px 16px}
+  .btn-teal{background:var(--teal); color:var(--navy)}
+  .btn-teal:hover{background:#5cc0b0}
+  .btn-ghost{background:transparent; color:#9fc3ba; border:1px solid rgba(180,255,235,.2); font-family:var(--body); font-weight:600; font-size:13px; padding:8px 12px}
+  .btn-ghost:hover{color:#fff; border-color:var(--teal)}
+
+  ul.names{list-style:none; margin:0; padding:0; max-height:300px; overflow:auto}
+  ul.names li{display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid rgba(255,255,255,.06); font-size:15px; color:#eaf6f3}
+  ul.names li.done{color:#5e8c84}
+  ul.names li.done .who{text-decoration:line-through}
+  .who{flex:1}
+  .tick{font-size:12px; color:var(--teal); font-family:var(--display); letter-spacing:.08em; text-transform:uppercase}
+  .rm{background:none; border:0; color:#5e8c84; cursor:pointer; font-size:18px; line-height:1; padding:2px 6px; border-radius:6px}
+  .rm:hover{color:#ff8a8a; background:rgba(255,138,138,.1)}
+  .empty{color:#5e8c84; font-size:14px; padding:14px 4px; text-align:center}
+
+  .opts{margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; gap:12px}
+  .toggle{display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14px; color:#cdeae4}
+  .toggle input{width:18px; height:18px; accent-color:var(--teal); cursor:pointer}
+  .meta{font-size:12px; color:#7fa9a0}
+  .row{display:flex; gap:8px; flex-wrap:wrap}
+
+  canvas.confetti{position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:9; filter:none}
+  @media (prefers-reduced-motion:reduce){ .hub,.hub:hover,.hub:active{transition:none} }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand">Charles &amp; Dean · Motor Finance</div>
+      <h1>Spotlight Wheel</h1>
+      <p class="sub">Spin to pick next week's spotlight. Closes the Motor Huddle on a high note.</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="stage">
+      <div class="wheelbox">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="880" height="880"></canvas>
+        <div class="hub" id="hub" role="button" tabindex="0" aria-label="Spin the wheel">Spin</div>
+      </div>
+      <div class="result">
+        <div id="resLabel" class="label" style="visibility:hidden">Next week's spotlight</div>
+        <div id="resName" class="name placeholder">Add the team, then give it a spin</div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2>The team</h2>
+      <div class="addrow">
+        <input type="text" id="nameInput" placeholder="Add a name…" autocomplete="off">
+        <button class="btn btn-teal" id="addBtn">Add</button>
+      </div>
+      <ul class="names" id="list"></ul>
+
+      <div class="opts">
+        <label class="toggle">
+          <input type="checkbox" id="fairToggle" checked>
+          <span>Everyone goes before repeats</span>
+        </label>
+        <div class="meta" id="cycleMeta"></div>
+        <div class="row">
+          <button class="btn-ghost" id="resetCycle">Start new cycle</button>
+          <button class="btn-ghost" id="clearAll">Clear list</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<canvas class="confetti" id="confetti"></canvas>
+
+<script>
+const SEG = ["#4FAD9F","#2d7d72","#3f9488","#1f6359"];
+let names = [];            // {id, name}
+let picked = new Set();    // ids picked this cycle
+let rotation = 0;          // radians
+let spinning = false;
+const reduce = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+const cv = document.getElementById("wheel");
+const ctx = cv.getContext("2d");
+const hub = document.getElementById("hub");
+const listEl = document.getElementById("list");
+const nameInput = document.getElementById("nameInput");
+const fairToggle = document.getElementById("fairToggle");
+const resName = document.getElementById("resName");
+const resLabel = document.getElementById("resLabel");
+const cycleMeta = document.getElementById("cycleMeta");
+
+/* ---------- persistence (localStorage for GitHub Pages) ---------- */
+function save(){
+  const state = {names, picked:[...picked], fair:fairToggle.checked};
+  try {
+    localStorage.setItem("huddle:state", JSON.stringify(state));
+  } catch(e) {
+    console.warn("Could not save to localStorage", e);
+  }
+}
+
+function load(){
+  try {
+    const r = localStorage.getItem("huddle:state");
+    if(r) return JSON.parse(r);
+  } catch(e) {
+    console.warn("Could not load from localStorage", e);
+  }
+  return null;
+}
+
+/* ---------- model ---------- */
+let uid = 1;
+function active(){ return fairToggle.checked ? names.filter(n=>!picked.has(n.id)) : names.slice(); }
+
+function addName(raw){
+  const name = raw.trim();
+  if(!name) return;
+  names.push({id:uid++, name});
+  nameInput.value="";
+  render(); save();
+}
+
+function removeName(id){
+  names = names.filter(n=>n.id!==id);
+  picked.delete(id);
+  render(); save();
+}
+
+/* ---------- wheel drawing ---------- */
+function draw(){
+  const list = active();
+  const n = list.length;
+  const S = cv.width, R = S/2, cx=R, cy=R;
+  ctx.clearRect(0,0,S,S);
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(rotation);
+
+  if(n===0){
+    ctx.beginPath(); ctx.arc(0,0,R-8,0,Math.PI*2);
+    ctx.fillStyle="#0d2f44"; ctx.fill();
+    ctx.lineWidth=10; ctx.strokeStyle="#13405a"; ctx.stroke();
+    ctx.restore(); return;
+  }
+  const step = (Math.PI*2)/n;
+  for(let i=0;i<n;i++){
+    const a0 = i*step, a1=a0+step;
+    ctx.beginPath(); ctx.moveTo(0,0);
+    ctx.arc(0,0,R-8,a0,a1); ctx.closePath();
+    ctx.fillStyle = SEG[i % (n===2?2:SEG.length)];
+    ctx.fill();
+    ctx.lineWidth=3; ctx.strokeStyle="#051C2C"; ctx.stroke();
+    // label
+    ctx.save();
+    ctx.rotate(a0+step/2);
+    ctx.textAlign="right"; ctx.textBaseline="middle";
+    ctx.fillStyle="#03161f";
+    const size = Math.max(20, Math.min(40, 320/Math.max(n,4)));
+    ctx.font = `700 ${size}px "Space Grotesk", sans-serif`;
+    let label = list[i].name;
+    const max = n>10?12:16;
+    if(label.length>max) label = label.slice(0,max-1)+"…";
+    ctx.fillText(label, R-44, 0);
+    ctx.restore();
+  }
+  // rim
+  ctx.beginPath(); ctx.arc(0,0,R-8,0,Math.PI*2);
+  ctx.lineWidth=10; ctx.strokeStyle="#B4FFEB"; ctx.globalAlpha=.85; ctx.stroke(); ctx.globalAlpha=1;
+  ctx.restore();
+}
+
+/* ---------- spin ---------- */
+function spin(){
+  const list = active();
+  if(spinning) return;
+  if(list.length===0){ flashEmpty(); return; }
+  if(list.length===1){ reveal(list[0]); return; }
+
+  spinning = true; hub.classList.add("busy"); hub.textContent="…";
+  resLabel.style.visibility="hidden";
+  resName.classList.add("placeholder"); resName.textContent="Spinning…";
+
+  const n = list.length, step=(Math.PI*2)/n;
+  const target = Math.floor(Math.random()*n);
+  const turns = reduce ? 1 : (5 + Math.floor(Math.random()*3));
+  // pointer is at top (-90deg). segment center under pointer:
+  const pointerA = -Math.PI/2;
+  const segCenter = target*step + step/2;
+  let finalRot = (turns*Math.PI*2) + (pointerA - segCenter);
+  // normalise relative to current
+  const start = rotation;
+  const delta = finalRot - (start % (Math.PI*2));
+  const dur = reduce ? 600 : 4200;
+  const t0 = performance.now();
+
+  function frame(t){
+    const p = Math.min(1,(t-t0)/dur);
+    const e = 1 - Math.pow(1-p, 3); // ease-out cubic
+    rotation = start + delta*e;
+    draw();
+    if(p<1){ requestAnimationFrame(frame); }
+    else{
+      spinning=false; hub.classList.remove("busy"); hub.textContent="Spin";
+      reveal(list[target]);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function reveal(person){
+  resLabel.style.visibility="visible";
+  resName.classList.remove("placeholder");
+  resName.textContent = person.name;
+  if(fairToggle.checked){ picked.add(person.id); }
+  render(); save();
+  if(!reduce) burst();
+}
+
+function flashEmpty(){
+  resLabel.style.visibility="hidden";
+  resName.classList.remove("placeholder");
+  resName.textContent = "Everyone's had a turn — start a new cycle";
+  setTimeout(()=>{ resName.classList.add("placeholder"); resName.textContent="Add the team, then give it a spin"; }, 2600);
+}
+
+/* ---------- list + meta render ---------- */
+function render(){
+  listEl.innerHTML="";
+  if(names.length===0){
+    listEl.innerHTML='<div class="empty">No names yet. Add your sales and ops team above.</div>';
+  } else {
+    names.forEach(p=>{
+      const li=document.createElement("li");
+      const done = fairToggle.checked && picked.has(p.id);
+      if(done) li.className="done";
+      li.innerHTML = `<span class="who">${escapeHtml(p.name)}</span>` +
+        (done?'<span class="tick">done</span>':'') +
+        `<button class="rm" title="Remove" data-id="${p.id}">×</button>`;
+      listEl.appendChild(li);
+    });
+  }
+  const rem = active().length;
+  if(fairToggle.checked && names.length){
+    cycleMeta.textContent = `${rem} of ${names.length} still to go this cycle`;
+  } else if(names.length){
+    cycleMeta.textContent = `${names.length} in the draw`;
+  } else { cycleMeta.textContent=""; }
+  draw();
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+/* ---------- confetti ---------- */
+const cc = document.getElementById("confetti"); const cctx = cc.getContext("2d");
+function sizeConfetti(){ cc.width=innerWidth; cc.height=innerHeight; }
+sizeConfetti(); addEventListener("resize", ()=>{sizeConfetti(); fitWheel();});
+function burst(){
+  const cols=["#4FAD9F","#B4FFEB","#ffffff","#2d7d72"];
+  const parts=[]; const N=120;
+  for(let i=0;i<N;i++){
+    parts.push({x:innerWidth/2,y:innerHeight*0.38,
+      vx:(Math.random()-.5)*14, vy:(Math.random()*-12)-4,
+      g:.32+Math.random()*.15, s:5+Math.random()*7,
+      c:cols[i%cols.length], rot:Math.random()*6, vr:(Math.random()-.5)*.4, life:0});
+  }
+  let frames=0;
+  (function run(){
+    cctx.clearRect(0,0,cc.width,cc.height); frames++;
+    parts.forEach(p=>{ p.vy+=p.g; p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr;
+      cctx.save(); cctx.translate(p.x,p.y); cctx.rotate(p.rot);
+      cctx.fillStyle=p.c; cctx.fillRect(-p.s/2,-p.s/2,p.s,p.s*0.6); cctx.restore(); });
+    if(frames<140) requestAnimationFrame(run); else cctx.clearRect(0,0,cc.width,cc.height);
+  })();
+}
+
+/* ---------- responsive canvas ---------- */
+function fitWheel(){ const dpr=Math.min(2,devicePixelRatio||1); const css=cv.clientWidth;
+  cv.width=css*dpr; cv.height=css*dpr; draw(); }
+
+/* ---------- events ---------- */
+hub.addEventListener("click", spin);
+hub.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault(); spin();} });
+document.getElementById("addBtn").addEventListener("click", ()=>addName(nameInput.value));
+nameInput.addEventListener("keydown", e=>{ if(e.key==="Enter") addName(nameInput.value); });
+listEl.addEventListener("click", e=>{ const b=e.target.closest(".rm"); if(b) removeName(+b.dataset.id); });
+fairToggle.addEventListener("change", ()=>{ render(); save(); });
+document.getElementById("resetCycle").addEventListener("click", ()=>{
+  picked.clear(); render(); save();
+  resLabel.style.visibility="hidden"; resName.classList.add("placeholder");
+  resName.textContent="New cycle — everyone's back in";
+  setTimeout(()=>{ if(resName.textContent.startsWith("New cycle")){resName.textContent="Add the team, then give it a spin";} },2200);
+});
+document.getElementById("clearAll").addEventListener("click", ()=>{
+  if(!names.length || confirm("Remove all names?")){ names=[]; picked.clear(); render(); save(); }
+});
+
+/* ---------- init ---------- */
+(function(){
+  const st = load();
+  if(st){
+    names = st.names||[]; picked = new Set(st.picked||[]);
+    if(typeof st.fair==="boolean") fairToggle.checked=st.fair;
+    uid = (names.reduce((m,n)=>Math.max(m,n.id),0)||0)+1;
+  }
+  fitWheel(); render();
+})();
+</script>
